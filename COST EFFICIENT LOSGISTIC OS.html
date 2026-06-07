@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CostSaver Global Logistics OS</title>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.css" rel="stylesheet">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+    
+    <style>
+        :root {
+            --primary: #1e3a8a;
+            --secondary: #0d9488;
+            --accent: #f59e0b;
+            --neutral-dark: #1f2937;
+            --neutral-light: #f3f4f6;
+            --sidebar-width: 260px;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--neutral-light);
+            color: var(--neutral-dark);
+            overflow-x: hidden;
+        }
+        .sidebar {
+            width: var(--sidebar-width);
+            background: linear-gradient(180deg, #1e3a8a 0%, #0f172a 100%);
+            transition: all 0.3s ease;
+        }
+        .main-content {
+            margin-left: var(--sidebar-width);
+            width: calc(100% - var(--sidebar-width));
+            transition: all 0.3s ease;
+        }
+        .nav-item.active {
+            background-color: rgba(255, 255, 255, 0.15);
+            border-left: 4px solid var(--accent);
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .map-container {
+            height: calc(100vh - 220px);
+            min-height: 500px;
+        }
+        .custom-toast {
+            animation: slideIn 0.3s ease forwards, fadeOut 0.3s ease 2.7s forwards;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .tab-panel {
+            display: none;
+        }
+        .tab-panel.active {
+            display: block;
+        }
+        /* Fix Leaflet control placement conflict with Tailwind */
+        .leaflet-top, .leaflet-bottom {
+            z-index: 400 !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 flex">
+
+    <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-3 pointer-events-none"></div>
+
+    <aside class="sidebar fixed top-0 bottom-0 left-0 z-30 flex flex-col text-white shadow-xl">
+        <div class="p-5 flex items-center gap-3 border-b border-blue-900">
+            <i class="fas fa-boxes text-yellow-400 text-2xl"></i>
+            <div>
+                <h1 class="font-bold text-lg leading-none">CostSaver</h1>
+                <span class="text-xs text-blue-300">Global Logistics OS</span>
+            </div>
+        </div>
+        <nav class="flex-1 py-4 overflow-y-auto">
+            <a href="#" onclick="App.switchTab('dashboard')" class="nav-item flex items-center gap-3 px-5 py-3 text-sm text-gray-200 hover:bg-blue-900 hover:text-white transition-all active" id="nav-dashboard">
+                <i class="fas fa-chart-pie w-5"></i> Dashboard
+            </a>
+            <a href="#" onclick="App.switchTab('map')" class="nav-item flex items-center gap-3 px-5 py-3 text-sm text-gray-200 hover:bg-blue-900 hover:text-white transition-all" id="nav-map">
+                <i class="fas fa-map-marked-alt w-5"></i> Route Optimizer
+            </a>
+            <a href="#" onclick="App.switchTab('shipments')" class="nav-item flex items-center gap-3 px-5 py-3 text-sm text-gray-200 hover:bg-blue-900 hover:text-white transition-all" id="nav-shipments">
+                <i class="fas fa-shipping-fast w-5"></i> Shipment Manager
+            </a>
+            <a href="#" onclick="App.switchTab('fleet')" class="nav-item flex items-center gap-3 px-5 py-3 text-sm text-gray-200 hover:bg-blue-900 hover:text-white transition-all" id="nav-fleet">
+                <i class="fas fa-truck w-5"></i> Fleet Operator
+            </a>
+            <a href="#" onclick="App.switchTab('warehouses')" class="nav-item flex items-center gap-3 px-5 py-3 text-sm text-gray-200 hover:bg-blue-900 hover:text-white transition-all" id="nav-warehouses">
+                <i class="fas fa-warehouse w-5"></i> Warehouse Operations
+            </a>
+            <a href="#" onclick="App.switchTab('inventory')" class="nav-item flex items-center gap-3 px-5 py-3 text-sm text-gray-200 hover:bg-blue-900 hover:text-white transition-all" id="nav-inventory">
+                <i class="fas fa-dolly w-5"></i> Inventory & SKUs
+            </a>
+            <a href="#" onclick="App.switchTab('analytics')" class="nav-item flex items-center gap-3 px-5 py-3 text-sm text-gray-200 hover:bg-blue-900 hover:text-white transition-all" id="nav-analytics">
+                <i class="fas fa-chart-line w-5"></i> Financial Intelligence
+            </a>
+        </nav>
+        <div class="p-4 border-t border-blue-900 text-xs text-blue-300 bg-blue-950 flex justify-between items-center">
+            <span>Engine: v4.2-Prod</span>
+            <span id="connection-status" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-400"></span> Local-First</span>
+        </div>
+    </aside>
+
+    <main class="main-content flex-1 flex flex-col min-h-screen">
+        
+        <header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 sticky top-0 z-20 shadow-sm">
+            <div class="flex items-center gap-4">
+                <h2 id="page-title" class="text-xl font-bold text-gray-800">Executive Dashboard</h2>
+            </div>
+            <div class="flex items-center gap-6">
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs font-semibold text-yellow-800">
+                    <i class="fas fa-piggy-bank text-yellow-600 text-sm"></i>
+                    <span>Est. Savings Engine Run: <span id="header-savings">$0.00</span></span>
+                </div>
+                <div class="flex items-center gap-3 border-l pl-6 border-gray-200">
+                    <div class="text-right">
+                        <p class="text-sm font-semibold text-gray-700">Logistics Control</p>
+                        <p class="text-xs text-gray-400">Principal Architect</p>
+                    </div>
+                    <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow">
+                        HQ
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="p-6 flex-1 overflow-x-hidden">
+
+            <div id="panel-dashboard" class="tab-panel active space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active Shipments</p>
+                            <h3 class="text-3xl font-bold text-gray-800 mt-1" id="dash-active-shipments">0</h3>
+                            <p class="text-xs text-green-500 mt-1"><i class="fas fa-arrow-up"></i> Live operations</p>
+                        </div>
+                        <div class="p-3 bg-blue-50 text-blue-600 rounded-xl"><i class="fas fa-shipping-fast text-2xl"></i></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Fleet Utilization</p>
+                            <h3 class="text-3xl font-bold text-gray-800 mt-1" id="dash-fleet-utilization">0%</h3>
+                            <p class="text-xs text-blue-500 mt-1" id="dash-fleet-status-text">0/0 Active Assets</p>
+                        </div>
+                        <div class="p-3 bg-teal-50 text-teal-600 rounded-xl"><i class="fas fa-truck text-2xl"></i></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Warehouses</p>
+                            <h3 class="text-3xl font-bold text-gray-800 mt-1" id="dash-total-warehouses">0</h3>
+                            <p class="text-xs text-purple-500 mt-1" id="dash-warehouse-occupancy">0% Avg Occupancy</p>
+                        </div>
+                        <div class="p-3 bg-purple-50 text-purple-600 rounded-xl"><i class="fas fa-warehouse text-2xl"></i></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Projected Cost Saved</p>
+                            <h3 class="text-3xl font-bold text-green-600 mt-1" id="dash-total-savings">$0.00</h3>
+                            <p class="text-xs text-green-600 mt-1"><i class="fas fa-check-circle"></i> AI Optimized</p>
+                        </div>
+                        <div class="p-3 bg-green-50 text-green-600 rounded-xl"><i class="fas fa-hand-holding-usd text-2xl"></i></div>
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-r from-blue-900 to-indigo-950 p-6 rounded-xl shadow-md text-white">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-brain text-yellow-400 text-xl"></i>
+                            <h3 class="text-lg font-bold">CostSaver™ Autonomous Freight Advisory Engine</h3>
+                        </div>
+                        <span class="bg-yellow-500 text-slate-900 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">Actionable Intelligence</span>
+                    </div>
+                    <div id="cost-savings-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="font-bold text-gray-800">Operational Trajectory (Active vs Delivered)</h4>
+                        </div>
+                        <div class="h-64"><canvas id="chart-shipment-trends"></canvas></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="font-bold text-gray-800">Fleet Deployment Ratio</h4>
+                        </div>
+                        <div class="h-64"><canvas id="chart-fleet-utilization"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="panel-map" class="tab-panel space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-4">
+                        <h3 class="text-lg font-bold text-gray-800 border-b pb-2"><i class="fas fa-route text-blue-600"></i> Route Topology Config</h3>
+                        
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Origin Node Location</label>
+                                <select id="route-origin" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Intermediate Nodes / Waypoint (Optional)</label>
+                                <select id="route-waypoint" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">-- None (Direct Route) --</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Destination Node Location</label>
+                                <select id="route-destination" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Optimization Cost Function Matrix</label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs cursor-pointer border hover:border-blue-500">
+                                        <input type="radio" name="route-profile" value="cheapest" checked class="text-blue-600"> <span>Cheapest</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs cursor-pointer border hover:border-blue-500">
+                                        <input type="radio" name="route-profile" value="fastest" class="text-blue-600"> <span>Fastest</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs cursor-pointer border hover:border-blue-500">
+                                        <input type="radio" name="route-profile" value="safest" class="text-blue-600"> <span>Safest</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs cursor-pointer border hover:border-blue-500">
+                                        <input type="radio" name="route-profile" value="efficient" class="text-blue-600"> <span>Fuel Econ</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Asset Allocation Class</label>
+                                <select id="route-vehicle-type" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="Truck">Standard Cargo Truck (15L/100km)</option>
+                                    <option value="Heavy Truck">Heavy Freight Rigid (25L/100km)</option>
+                                    <option value="Container Truck">Articulated Container (35L/100km)</option>
+                                    <option value="Van">Light Commercial Van (9L/100km)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button onclick="App.routeEngine.computeRoute()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg text-sm transition-all shadow-md mt-2 flex items-center justify-center gap-2">
+                            <i class="fas fa-calculator"></i> Run Cost Optimization
+                        </button>
+
+                        <div id="route-metrics-panel" class="hidden border-t pt-4 mt-2 space-y-2.5 text-xs">
+                            <h4 class="font-bold text-gray-700 uppercase tracking-wide text-center bg-gray-100 py-1 rounded">Cost Metrics Projection</h4>
+                            <div class="flex justify-between border-b pb-1">
+                                <span class="text-gray-500">Distance Topology:</span>
+                                <span id="metric-distance" class="font-semibold text-gray-800">0.00 km</span>
+                            </div>
+                            <div class="flex justify-between border-b pb-1">
+                                <span class="text-gray-500">Estimated Timeline:</span>
+                                <span id="metric-eta" class="font-semibold text-gray-800">0.00 hrs</span>
+                            </div>
+                            <div class="flex justify-between border-b pb-1">
+                                <span class="text-gray-500">Fuel Allocation Cost:</span>
+                                <span id="metric-fuel" class="font-semibold text-green-700">$0.00</span>
+                            </div>
+                            <div class="flex justify-between border-b pb-1">
+                                <span class="text-gray-500">Tolls & Tariffs:</span>
+                                <span id="metric-tolls" class="font-semibold text-red-600">$0.00</span>
+                            </div>
+                            <div class="flex justify-between border-b pb-1">
+                                <span class="text-gray-500">Operator/Driver Cost:</span>
+                                <span id="metric-driver" class="font-semibold text-gray-800">$0.00</span>
+                            </div>
+                            <div class="flex justify-between border-b pb-1">
+                                <span class="text-gray-500">Maintenance Wear-and-Tear:</span>
+                                <span id="metric-maint" class="font-semibold text-gray-800">$0.00</span>
+                            </div>
+                            <div class="flex justify-between pt-1 font-bold text-sm bg-blue-50 p-2 rounded text-blue-900">
+                                <span>TOTAL OPEX COST:</span>
+                                <span id="metric-total-cost">$0.00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-2 rounded-xl shadow-sm border border-gray-100 lg:col-span-3 relative">
+                        <div id="map" class="map-container rounded-lg w-full"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="panel-shipments" class="tab-panel space-y-6">
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap justify-between items-center gap-4">
+                    <div class="flex items-center gap-3 flex-1 min-w-[300px]">
+                        <div class="relative w-full">
+                            <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                            <input type="text" id="shipment-search" oninput="App.shipmentModule.renderTable()" placeholder="Filter via ID, Customer, Manifest Name..." class="w-full bg-gray-50 border border-gray-200 rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <select id="shipment-filter-status" onchange="App.shipmentModule.renderTable()" class="bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">All Statuses</option>
+                            <option value="Planned">Planned</option>
+                            <option value="Assigned">Assigned</option>
+                            <option value="Loading">Loading</option>
+                            <option value="In Transit">In Transit</option>
+                            <option value="Delayed">Delayed</option>
+                            <option value="Delivered">Delivered</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="App.shipmentModule.export('csv')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg text-sm transition-all flex items-center gap-2">
+                            <i class="fas fa-file-csv"></i> Export CSV
+                        </button>
+                        <button onclick="App.shipmentModule.export('json')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg text-sm transition-all flex items-center gap-2">
+                            <i class="fas fa-file-code"></i> Export JSON
+                        </button>
+                        <button onclick="App.openModal('modal-shipment')" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-all flex items-center gap-2 shadow-md">
+                            <i class="fas fa-plus"></i> Standard Manifest Intake
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-gray-50 text-gray-400 font-semibold text-xs uppercase tracking-wider border-b border-gray-100">
+                                    <th class="p-4">Shipment Manifest UUID</th>
+                                    <th class="p-4">Cargo Class Details</th>
+                                    <th class="p-4">Origin / Dest Nodes</th>
+                                    <th class="p-4">Payload Spec</th>
+                                    <th class="p-4">Lifecycle Status</th>
+                                    <th class="p-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="shipment-table-body" class="text-sm divide-y divide-gray-100">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="panel-fleet" class="tab-panel space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 h-fit space-y-4">
+                        <h3 class="text-lg font-bold text-gray-800 border-b pb-2"><i class="fas fa-truck-monster text-blue-600"></i> Commission Fleet Vehicle</h3>
+                        <form id="form-fleet" onsubmit="App.fleetModule.handleSave(event)" class="space-y-3">
+                            <input type="hidden" id="fleet-id">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Registration Matrix (License Plate)</label>
+                                <input type="text" id="fleet-reg" required placeholder="e.g. TX-9842-LOG" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Vehicle Platform Specification</label>
+                                <select id="fleet-type" required class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="Car">Light Utility Car</option>
+                                    <option value="Van">Commercial Delivery Van</option>
+                                    <option value="Truck">Medium Duty Rigid Cargo Truck</option>
+                                    <option value="Heavy Truck">Heavy Duty Multiaxle Rig</option>
+                                    <option value="Container Truck">Intermodal Articulated Container Truck</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Max Weight Capacity payload (kg)</label>
+                                <input type="number" id="fleet-capacity" required placeholder="e.g. 18000" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Fuel Economy Base Metric (L/100km)</label>
+                                <input type="number" step="0.1" id="fleet-efficiency" required placeholder="e.g. 24.5" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Assigned Operator/Driver</label>
+                                <input type="text" id="fleet-driver" required placeholder="e.g. Marcus Vance" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Deployment Operational Status</label>
+                                <select id="fleet-status" required class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="Active">Active / On-Route</option>
+                                    <option value="Idle">Idle / Available</option>
+                                    <option value="Maintenance">Maintenance / Out-of-service</option>
+                                </select>
+                            </div>
+                            <div class="flex gap-2 pt-2">
+                                <button type="button" onclick="App.fleetModule.resetForm()" class="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold py-2 rounded-lg transition-all">Reset</button>
+                                <button type="submit" class="w-1/2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 rounded-lg transition-all shadow">Save Asset</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 lg:col-span-3 space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-bold text-gray-800">Operational Fleet Assets Repository</h3>
+                            <div class="flex gap-2">
+                                <button onclick="App.fleetModule.export('csv')" class="text-xs bg-gray-100 hover:bg-gray-200 font-semibold p-2 rounded border"><i class="fas fa-file-csv text-green-600"></i> Export</button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 text-gray-400 font-semibold text-xs uppercase border-b">
+                                        <th class="p-3">Asset Registration</th>
+                                        <th class="p-3">Classification Class</th>
+                                        <th class="p-3">Capacity Specs</th>
+                                        <th class="p-3">Assigned Operator</th>
+                                        <th class="p-3">Status Block</th>
+                                        <th class="p-3 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="fleet-table-body" class="text-sm divide-y">
+                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="panel-warehouses" class="tab-panel space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 h-fit space-y-4">
+                        <h3 class="text-lg font-bold text-gray-800 border-b pb-2"><i class="fas fa-warehouse text-blue-600"></i> Establish Warehouse Node</h3>
+                        <form id="form-warehouse" onsubmit="App.warehouseModule.handleSave(event)" class="space-y-3">
+                            <input type="hidden" id="warehouse-id">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Facility Descriptive Name</label>
+                                <input type="text" id="warehouse-name" required placeholder="e.g. Rotterdam Hub-Alpha" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Geographic/City Location</label>
+                                <input type="text" id="warehouse-location" required placeholder="e.g. Rotterdam Seaport" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Maximum Floor Volumetric Capacity (m³)</label>
+                                <input type="number" id="warehouse-capacity" required placeholder="e.g. 75000" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Assigned Station Managing Director</label>
+                                <input type="text" id="warehouse-manager" required placeholder="e.g. Dieter Kaufmann" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="flex gap-2 pt-2">
+                                <button type="button" onclick="App.warehouseModule.resetForm()" class="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold py-2 rounded-lg transition-all">Reset</button>
+                                <button type="submit" class="w-1/2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 rounded-lg transition-all shadow">Save Node</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 lg:col-span-3 space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-bold text-gray-800">Global Node Facilities Topology</h3>
+                            <button onclick="App.warehouseModule.export('csv')" class="text-xs bg-gray-100 hover:bg-gray-200 font-semibold p-2 rounded border"><i class="fas fa-file-csv text-green-600"></i> Export CSV</button>
+                        </div>
+                        <div id="warehouse-cards-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="panel-inventory" class="tab-panel space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 h-fit space-y-4">
+                        <h3 class="text-lg font-bold text-gray-800 border-b pb-2"><i class="fas fa-boxes text-blue-600"></i> Stock SKU Intake Ledger</h3>
+                        <form id="form-inventory" onsubmit="App.inventoryModule.handleSave(event)" class="space-y-3">
+                            <input type="hidden" id="inventory-id">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Stock Keeping Unit (SKU-ID Code)</label>
+                                <input type="text" id="inventory-sku" required placeholder="e.g. SKU-CON-9024" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Product Manifest Designation Name</label>
+                                <input type="text" id="inventory-name" required placeholder="e.g. High Grade Lithium Cells" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Quantity Metric Unit Count</label>
+                                <input type="number" id="inventory-quantity" required placeholder="e.g. 500" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Assigned Base Warehouse Allocation Node</label>
+                                <select id="inventory-warehouse" required class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Lifecycle Tracking Flow Status</label>
+                                <select id="inventory-status" required class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="In Stock">In Stock / Warehouse Floor</option>
+                                    <option value="Reserved">Reserved Allocation</option>
+                                    <option value="Loading">Staged Loading Bay</option>
+                                    <option value="In Transit">In Transit Freight Line</option>
+                                    <option value="Delivered">Delivered Transferred Custody</option>
+                                </select>
+                            </div>
+                            <div class="flex gap-2 pt-2">
+                                <button type="button" onclick="App.inventoryModule.resetForm()" class="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold py-2 rounded-lg transition-all">Reset</button>
+                                <button type="submit" class="w-1/2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 rounded-lg transition-all shadow">Commit Ledger</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 lg:col-span-3 space-y-6">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-bold text-gray-800">Master Stock SKU Infrastructure Matrix</h3>
+                            <button onclick="App.inventoryModule.export('csv')" class="text-xs bg-gray-100 hover:bg-gray-200 font-semibold p-2 rounded border"><i class="fas fa-file-csv text-green-600"></i> Export CSV</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 text-gray-400 font-semibold text-xs uppercase border-b">
+                                        <th class="p-3">SKU Universal Identifier</th>
+                                        <th class="p-3">Product Designation Name</th>
+                                        <th class="p-3">Count Vol</th>
+                                        <th class="p-3">Allocated Node Hub</th>
+                                        <th class="p-3">Flow Status State</th>
+                                        <th class="p-3 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inventory-table-body" class="text-sm divide-y">
+                                    </tbody>
+                            </table>
+                        </div>
+
+                        <div class="border-t pt-6">
+                            <h4 class="font-bold text-gray-800 mb-4"><i class="fas fa-history text-indigo-600"></i> Audit Trajectory Ledger Timeline (Global Stock Movements)</h4>
+                            <div id="inventory-timeline" class="space-y-3 relative before:absolute before:bottom-0 before:top-2 before:left-3.5 before:w-0.5 before:bg-gray-200">
+                                </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="panel-analytics" class="tab-panel space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                        <h4 class="font-bold text-gray-800 mb-3">Freight Route Group Efficiencies</h4>
+                        <div class="h-60"><canvas id="chart-route-performance"></canvas></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                        <h4 class="font-bold text-gray-800 mb-3">Opex Cost Allocation Matrix Trends</h4>
+                        <div class="h-60"><canvas id="chart-cost-trends"></canvas></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                        <h4 class="font-bold text-gray-800 mb-3">Lifecycle Delivery SLA Success Rate</h4>
+                        <div class="h-60"><canvas id="chart-delivery-success"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h4 class="font-bold text-gray-800 mb-4"><i class="fas fa-calculator text-blue-600"></i> Financial Operational Intelligence Breakdown Matrix</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <p class="text-xs text-gray-400 font-semibold uppercase">Total Projected Opex Cost Run</p>
+                            <p id="analytics-total-opex" class="text-2xl font-bold text-gray-800 mt-1">$0.00</p>
+                        </div>
+                        <div class="p-4 bg-green-50 rounded-lg">
+                            <p class="text-xs text-green-600 font-semibold uppercase">Realized Optimization Savings</p>
+                            <p id="analytics-total-savings" class="text-2xl font-bold text-green-600 mt-1">$0.00</p>
+                        </div>
+                        <div class="p-4 bg-blue-50 rounded-lg">
+                            <p class="text-xs text-blue-600 font-semibold uppercase">Average Cost per Shipment</p>
+                            <p id="analytics-avg-cost" class="text-2xl font-bold text-blue-800 mt-1">$0.00</p>
+                        </div>
+                        <div class="p-4 bg-yellow-50 rounded-lg">
+                            <p class="text-xs text-yellow-600 font-semibold uppercase">Asset Return On Investment Factor</p>
+                            <p id="analytics-roi-factor" class="text-2xl font-bold text-yellow-800 mt-1">0.0x</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <div id="modal-shipment" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 class="text-lg font-bold text-gray-800" id="shipment-modal-title"><i class="fas fa-clipboard-list text-blue-600"></i> Standard Manifest Intake Protocol</h3>
+                <button onclick="App.closeModal('modal-shipment')" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            <form id="form-shipment" onsubmit="App.shipmentModule.handleSave(event)" class="p-6 space-y-4">
+                <input type="hidden" id="shipment-id">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Cargo Descriptive Name</label>
+                        <input type="text" id="shipment-name" required placeholder="e.g. Pharmaceutical Medical Supplies" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Cargo Operational Category</label>
+                        <select id="shipment-category" required class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="Electronics">High-Tech Electronics</option>
+                            <option value="Pharmaceuticals">Temperature-Controlled Pharma</option>
+                            <option value="Automotive">Automotive Industrial Components</option>
+                            <option value="Dry Van">General Dry Van Palletized</option>
+                            <option value="Hazardous">Class 9 Hazardous Chemicals</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Origin Facility / Node</label>
+                        <select id="shipment-origin" required class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Destination Target Node</label>
+                        <select id="shipment-destination" required class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Payload Weight Spec (kg)</label>
+                        <input type="number" id="shipment-weight" required placeholder="e.g. 12500" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Payload Volumetric Space (m³)</label>
+                        <input type="number" id="shipment-volume" required placeholder="e.g. 45" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Consignee Customer Corporate Entity</label>
+                        <input type="text" id="shipment-customer" required placeholder="e.g. Nexus Global Trade Inc" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">SLA Execution Target Deadline</label>
+                        <input type="date" id="shipment-deadline" required class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Priority Execution Layer</label>
+                        <select id="shipment-priority" required class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="Critical">Critical Path (Next Gen Air/Express)</option>
+                            <option value="High">High Expedited Freight</option>
+                            <option value="Standard">Standard Matrix Delivery</option>
+                            <option value="Low">Low Economy Consolidate</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Assigned Operational Fleet Asset</label>
+                        <select id="shipment-vehicle" class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Lifecycle Operations State Track</label>
+                        <select id="shipment-status" required class="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="Planned">Planned Operations Manifest</option>
+                            <option value="Assigned">Assigned Logistics Asset Run</option>
+                            <option value="Loading">Loading Bay Physical Packing</option>
+                            <option value="In Transit">In Transit High-Road Linehaul</option>
+                            <option value="Delayed">Delayed Logistics Hold Exception</option>
+                            <option value="Delivered">Delivered Final Destination SLA Signed</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 border-t pt-4 mt-4">
+                    <button type="button" onclick="App.closeModal('modal-shipment')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg text-sm transition-all">Cancel</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-all shadow-md">Commit Manifest</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * COSTSAVER GLOBAL LOGISTICS OPERATING SYSTEM CORE ENGINE ARCHITECTURE
+         * AUTHOR: PRINCIPAL SYSTEMS ARCHITECT / LOGISTICS OPTIMIZATION ENGINEER
+         * SINGLE-FILE PRODUCTION DEPLOYMENT CORE JAVASCRIPT LOGIC MATRIX
+         */
+
+        // INDEXEDDB DATA WRAPPER ENGINE OBJECT IMPLEMENTATION
+        class DBWrapper {
+            constructor() {
+                this.dbName = "CostSaverLogisticsOS_DB";
+                this.version = 1;
+                this.db = null;
+            }
+
+            async init() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.dbName, this.version);
+                    request.onerror = (e) => {
+                        console.error("IndexedDB Open Request Failure:", e);
+                        reject(e);
+                    };
+                    request.onsuccess = (e) => {
+                        this.db = e.target.result;
+                        resolve(this.db);
+                    };
+                    request.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains("shipments")) db.createObjectStore("shipments", { keyPath: "id" });
+                        if (!db.objectStoreNames.contains("vehicles")) db.createObjectStore("vehicles", { keyPath: "id" });
+                        if (!db.objectStoreNames.contains("warehouses")) db.createObjectStore("warehouses", { keyPath: "id" });
+                        if (!db.objectStoreNames.contains("inventory")) db.createObjectStore("inventory", { keyPath: "id" });
+                        if (!db.objectStoreNames.contains("timeline")) db.createObjectStore("timeline", { keyPath: "id" });
+                    };
+                });
+            }
+
+            async getAll(storeName) {
+                return new Promise((resolve, reject) => {
+                    if (!this.db) { resolve(this.getFallback(storeName)); return; }
+                    const tx = this.db.transaction(storeName, "readonly");
+                    const store = tx.objectStore(storeName);
+                    const req = store.getAll();
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => resolve(this.getFallback(storeName));
+                });
+            }
+
+            async put(storeName, item) {
+                return new Promise((resolve) => {
+                    this.putFallback(storeName, item);
+                    if (!this.db) { resolve(item); return; }
+                    const tx = this.db.transaction(storeName, "readwrite");
+                    const store = tx.objectStore(storeName);
+                    const req = store.put(item);
+                    req.onsuccess = () => resolve(item);
+                    req.onerror = () => resolve(item);
+                });
+            }
+
+            async delete(storeName, id) {
+                return new Promise((resolve) => {
+                    this.deleteFallback(storeName, id);
+                    if (!this.db) { resolve(id); return; }
+                    const tx = this.db.transaction(storeName, "readwrite");
+                    const store = tx.objectStore(storeName);
+                    const req = store.delete(id);
+                    req.onsuccess = () => resolve(id);
+                    req.onerror = () => resolve(id);
+                });
+            }
+
+            // LocalStorage Parallel Synchronous Fallback Engines
+            getFallback(storeName) {
+                const data = localStorage.getItem(`cs_${storeName}`);
+                return data ? JSON.parse(data) : [];
+            }
+            putFallback(storeName, item) {
+                const data = this.getFallback(storeName);
+                const idx = data.findIndex(i => i.id === item.id);
+                if (idx > -1) data[idx] = item; else data.push(item);
+                localStorage.setItem(`cs_${storeName}`, JSON.stringify(data));
+            }
+            deleteFallback(storeName, id) {
+                const data = this.getFallback(storeName);
+                const filtered = data.filter(i => i.id !== id);
+                localStorage.setItem(`cs_${storeName}`, JSON.stringify(filtered));
+            }
+        }
+
+        // GLOBAL OPERATIONAL STATE ENGINE INITIAL LOCAL DATABASE POPULATION
+        const SEED_DATA = {
+            warehouses: [
+                { id: "wh-1", name: "Rotterdam Super-Hub Alpha", location: "Rotterdam, NL", capacity: 150000, occupancy: 62000, manager: "Dieter Kaufmann" },
+                { id: "wh-2", name: "Singapore Port Logistics Center", location: "Singapore, SG", capacity: 200000, occupancy: 145000, manager: "Chen Wei" },
+                { id: "wh-3", name: "LAX Gateway Distribution Node", location: "Los Angeles, USA", capacity: 120000, occupancy: 42000, manager: "Sarah Jenkins" }
+            ],
+            vehicles: [
+                { id: "v-1", reg: "NL-82-ZBX", type: "Container Truck", capacity: 32000, efficiency: 32.0, driver: "Lukas de Jong", status: "Active" },
+                { id: "v-2", reg: "SG-900-PL", type: "Heavy Truck", capacity: 24000, efficiency: 26.5, driver: "Aris Bin Osman", status: "Idle" },
+                { id: "v-3", reg: "US-CA-928A", type: "Truck", capacity: 15000, efficiency: 18.0, driver: "John Miller", status: "Active" },
+                { id: "v-4", reg: "US-NY-4411", type: "Van", capacity: 3500, efficiency: 9.8, driver: "Elena Rostova", status: "Maintenance" }
+            ],
+            shipments: [
+                { id: "SH-9081", name: "Lithium-Ion Energy Storage Blocks", category: "Electronics", origin: "Singapore Port Logistics Center", destination: "Rotterdam Super-Hub Alpha", weight: 22000, volume: 80, customer: "Tesla Energy Europe", deadline: "2026-06-25", priority: "Critical", vehicle: "NL-82-ZBX", status: "In Transit" },
+                { id: "SH-4421", name: "Solid-State Medical Imaging Assemblies", category: "Pharmaceuticals", origin: "Rotterdam Super-Hub Alpha", destination: "LAX Gateway Distribution Node", weight: 8500, volume: 30, customer: "Siemens Healthineers", deadline: "2026-07-02", priority: "High", vehicle: "US-CA-928A", status: "Assigned" }
+            ],
+            inventory: [
+                { id: "inv-1", sku: "SKU-LI-ION-48V", name: "Lithium Modular Cell Packs 48V", quantity: 1200, warehouse: "Singapore Port Logistics Center", status: "In Stock" },
+                { id: "inv-2", sku: "SKU-MED-MRI-V4", name: "MRI Cooled Cryo-Sensor Heads", quantity: 14, warehouse: "Rotterdam Super-Hub Alpha", status: "Reserved" }
+            ],
+            timeline: [
+                { id: "t-1", timestamp: "2026-06-07 10:14", sku: "SKU-LI-ION-48V", message: "Initial Ledger Entry Commited at Singapore Port Logistics Center" },
+                { id: "t-2", timestamp: "2026-06-07 11:32", sku: "SKU-MED-MRI-V4", message: "SLA Reservation Allocation locked by Siemens Healthineers" }
+            ]
+        };
+
+        // PRINCIPAL PLATFORM ENGINE CONTROLLER RUN SYSTEM
+        class CorePlatform {
+            constructor() {
+                this.db = new DBWrapper();
+                this.charts = {};
+                this.map = null;
+                this.routingControl = null;
+                
+                // Static Coordinate Nodes Architecture Lookup Index For Routing System
+                this.geoNodes = {
+                    "Rotterdam Super-Hub Alpha": [51.9244, 4.4777],
+                    "Rotterdam Seaport": [51.9490, 4.1410],
+                    "Singapore Port Logistics Center": [1.2650, 103.8340],
+                    "LAX Gateway Distribution Node": [33.9416, -118.4085],
+                    "Los Angeles Port Terminal": [33.7431, -118.2673],
+                    "Frankfurt CargoCity South": [50.0333, 8.5705]
+                };
+            }
+
+            async start() {
+                await this.db.init();
+                await this.seedDatabaseIfEmpty();
+                
+                // Initialize UI Layout Interconnectivity Elements
+                this.toast("System Initialize: Launching CostSaver Global Logistics OS Engine...", "info");
+                this.initUIElements();
+                
+                // Run Component Module Compilers
+                await this.reloadAllModulesData();
+                this.initMapEngine();
+                this.initChartsEngine();
+                this.costSavingsEngine.compute();
+            }
+
+            async seedDatabaseIfEmpty() {
+                const currentShipments = await this.db.getAll("shipments");
+                if (currentShipments.length === 0) {
+                    for (const key of Object.keys(SEED_DATA)) {
+                        for (const record of SEED_DATA[key]) {
+                            await this.db.put(key, record);
+                        }
+                    }
+                }
+            }
+
+            initUIElements() {
+                // Populate Dropdown Select Fields Context Globally Across Views
+                this.populateDropdownSelects();
+            }
+
+            async reloadAllModulesData() {
+                this.shipments = await this.db.getAll("shipments");
+                this.vehicles = await this.db.getAll("vehicles");
+                this.warehouses = await this.db.getAll("warehouses");
+                this.inventory = await this.db.getAll("inventory");
+                this.timeline = await this.db.getAll("timeline");
+
+                // Cascade Render Table Refreshes
+                this.shipmentModule.renderTable();
+                this.fleetModule.renderTable();
+                this.warehouseModule.renderCards();
+                this.inventoryModule.renderTable();
+                this.renderDashboardMetrics();
+            }
+
+            populateDropdownSelects() {
+                const originSel = document.getElementById("route-origin");
+                const waypointSel = document.getElementById("route-waypoint");
+                const destSel = document.getElementById("route-destination");
+                
+                const shipOrigin = document.getElementById("shipment-origin");
+                const shipDest = document.getElementById("shipment-destination");
+                const shipVeh = document.getElementById("shipment-vehicle");
+                const invWh = document.getElementById("inventory-warehouse");
+
+                // Clear
+                if(originSel) originSel.innerHTML = "";
+                if(destSel) destSel.innerHTML = "";
+                if(shipOrigin) shipOrigin.innerHTML = "";
+                if(shipDest) shipDest.innerHTML = "";
+                if(shipVeh) shipVeh.innerHTML = '<option value="">-- No Vehicle Assigned --</option>';
+                if(invWh) invWh.innerHTML = "";
+
+                Object.keys(this.geoNodes).forEach(nodeName => {
+                    const opt = `<option value="${nodeName}">${nodeName}</option>`;
+                    if(originSel) originSel.insertAdjacentHTML('beforeend', opt);
+                    if(waypointSel) waypointSel.insertAdjacentHTML('beforeend', opt);
+                    if(destSel) destSel.insertAdjacentHTML('beforeend', opt);
+                    if(shipOrigin) shipOrigin.insertAdjacentHTML('beforeend', opt);
+                    if(shipDest) shipDest.insertAdjacentHTML('beforeend', opt);
+                });
+
+                this.db.getAll("warehouses").then(whs => {
+                    whs.forEach(w => {
+                        if(invWh) invWh.insertAdjacentHTML('beforeend', `<option value="${w.name}">${w.name}</option>`);
+                    });
+                });
+
+                this.db.getAll("vehicles").then(vhs => {
+                    vhs.forEach(v => {
+                        if(shipVeh) shipVeh.insertAdjacentHTML('beforeend', `<option value="${v.reg}">${v.reg} [${v.type}]</option>`);
+                    });
+                });
+            }
+
+            toast(message, type = "success") {
+                const container = document.getElementById("toastContainer");
+                const bgClass = type === "success" ? "bg-green-600" : type === "error" ? "bg-red-600" : "bg-blue-600";
+                const iconClass = type === "success" ? "fa-check-circle" : type === "error" ? "fa-exclamation-triangle" : "fa-info-circle";
+                
+                const html = `
+                    <div class="custom-toast pointer-events-auto flex items-center gap-3 text-white px-4 py-3 rounded-xl shadow-2xl ${bgClass} font-semibold text-sm">
+                        <i class="fas ${iconClass}"></i>
+                        <span>${message}</span>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', html);
+                setTimeout(() => { if(container.firstElementChild) container.firstElementChild.remove(); }, 3000);
+            }
+
+            switchTab(tabId) {
+                document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+                document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+                
+                document.getElementById(`panel-${tabId}`).classList.add("active");
+                document.getElementById(`nav-${tabId}`).classList.add("active");
+                
+                // Format Header Label
+                const titles = {
+                    dashboard: "Executive Dashboard Control Tower",
+                    map: "CostSaver™ Micro-OPEX Spatial Routing Engine",
+                    shipments: "Global Enterprise Shipment Logistics Manifest Matrix",
+                    fleet: "Heavy Asset Fleet Deployment Control Hub",
+                    warehouses: "Global Warehouse Node Operations & Capacity Matrix",
+                    inventory: "High Velocity Stock Keeping Unit Ledger System",
+                    analytics: "Autonomous Logistics Cost Optimization Matrix Analytics"
+                };
+                document.getElementById("page-title").innerText = titles[tabId] || "Control Platform";
+                
+                // Redraw Map Fix If Route Screen Triggered
+                if (tabId === "map" && this.map) {
+                    setTimeout(() => this.map.invalidateSize(), 200);
+                }
+                if (tabId === "analytics") {
+                    this.renderAnalyticsDataEngine();
+                }
+            }
+
+            openModal(id) { document.getElementById(id).classList.remove("hidden"); }
+            closeModal(id) { document.getElementById(id).classList.add("hidden"); }
+
+            // CORE MAP OPERATIONAL ENGINE INFRASTRUCTURE
+            initMapEngine() {
+                // Initialize Base Global Coordinate Leaflet Instance
+                this.map = L.map('map').setView([40.0, -20.0], 2);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(this.map);
+
+                // Draw Custom Domain Specific Interactive Location Markers On Canvas
+                Object.keys(this.geoNodes).forEach(key => {
+                    const latlng = this.geoNodes[key];
+                    L.marker(latlng)
+                        .addTo(this.map)
+                        .bindPopup(`<b>Logistics Node Architecture Hub:</b><br>${key}`);
+                });
+            }
+
+            // CORE CHARTS VISUALIZATION INTERFACE CONSOLE
+            initChartsEngine() {
+                const ctxTrends = document.getElementById("chart-shipment-trends").getContext("2d");
+                this.charts.trends = new Chart(ctxTrends, {
+                    type: 'line',
+                    data: {
+                        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                        datasets: [
+                            { label: 'Active Pipeline Run', data: [12, 19, 3, 5, 2, 15], borderColor: '#1e3a8a', tension: 0.3, fill: false },
+                            { label: 'SLA Deliveries Met', data: [45, 82, 91, 110, 134, 168], borderColor: '#0d9488', tension: 0.3, fill: false }
+                        ]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+
+                const ctxFleet = document.getElementById("chart-fleet-utilization").getContext("2d");
+                this.charts.fleet = new Chart(ctxFleet, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Active Operational', 'Idle Infrastructure', 'In Maintenance'],
+                        datasets: [{ data: [2, 1, 1], backgroundColor: ['#0d9488', '#f59e0b', '#ef4444'] }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+
+            renderDashboardMetrics() {
+                document.getElementById("dash-active-shipments").innerText = this.shipments.filter(s => s.status !== "Delivered").length;
+                
+                const totalFleet = this.vehicles.length;
+                const activeFleet = this.vehicles.filter(v => v.status === "Active").length;
+                const fleetPct = totalFleet > 0 ? Math.round((activeFleet / totalFleet) * 100) : 0;
+                document.getElementById("dash-fleet-utilization").innerText = `${fleetPct}%`;
+                document.getElementById("dash-fleet-status-text").innerText = `${activeFleet}/${totalFleet} Operating Mobile Units`;
+
+                document.getElementById("dash-total-warehouses").innerText = this.warehouses.length;
+                
+                let totalWhCap = 0, totalWhOcc = 0;
+                this.warehouses.forEach(w => { totalWhCap += w.capacity; totalWhOcc += w.occupancy; });
+                const whPct = totalWhCap > 0 ? Math.round((totalWhOcc / totalWhCap) * 100) : 0;
+                document.getElementById("dash-warehouse-occupancy").innerText = `${whPct}% Volumetric Floor Lock`;
+            }
+
+            renderAnalyticsDataEngine() {
+                // Compile and generate financial analytics indicators instantly
+                const opexTotal = this.shipments.length * 2450.00;
+                const totalSavings = parseFloat(document.getElementById("header-savings").innerText.replace(/[^0-9.-]+/g,"")) || 4850.00;
+                
+                document.getElementById("analytics-total-opex").innerText = `$${opexTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                document.getElementById("analytics-total-savings").innerText = `$${totalSavings.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                document.getElementById("analytics-avg-cost").innerText = `$${(opexTotal / (this.shipments.length || 1)).toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                document.getElementById("analytics-roi-factor").innerText = `${(totalSavings > 0 ? (opexTotal / totalSavings).toFixed(1) : "1.2")}x`;
+
+                // Render dynamic operational analytic helper graph data feeds
+                const ctxPerf = document.getElementById("chart-route-performance").getContext("2d");
+                if(this.charts.perf) this.charts.perf.destroy();
+                this.charts.perf = new Chart(ctxPerf, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Cheapest', 'Fastest', 'Safest', 'Fuel Econ'],
+                        datasets: [{ label: 'Efficiency Scaling Factor %', data: [94, 81, 72, 98], backgroundColor: '#3b82f6' }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+
+                const ctxCost = document.getElementById("chart-cost-trends").getContext("2d");
+                if(this.charts.costTrends) this.charts.costTrends.destroy();
+                this.charts.costTrends = new Chart(ctxCost, {
+                    type: 'line',
+                    data: {
+                        labels: ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4'],
+                        datasets: [{ label: 'Opex Drain Trace', data: [12000, 9400, 14000, 8100], borderColor: '#ef4444', fill: true, backgroundColor: 'rgba(239, 68, 68, 0.1)' }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+
+                const ctxSuccess = document.getElementById("chart-delivery-success").getContext("2d");
+                if(this.charts.success) this.charts.success.destroy();
+                this.charts.success = new Chart(ctxSuccess, {
+                    type: 'pie',
+                    data: {
+                        labels: ['In-SLA Window', 'Delayed Exception', 'Critical Breach'],
+                        datasets: [{ data: [92, 6, 2], backgroundColor: ['#10b981', '#f59e0b', '#ef4444'] }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+        }
+
+        // DYNAMIC SUB-ROUTING COMPUTATION OPTIMIZATION VECTOR INTERFACE MODULE
+        class RouteEngineModule {
+            constructor(platform) { this.platform = platform; }
+
+            computeRoute() {
+                const origin = document.getElementById("route-origin").value;
+                const waypoint = document.getElementById("route-waypoint").value;
+                const destination = document.getElementById("route-destination").value;
+                const profile = document.querySelector('name[name="route-profile"]:checked')?.value || "cheapest";
+                const vehicleType = document.getElementById("route-vehicle-type").value;
+
+                if (origin === destination) {
+                    this.platform.toast("Operational Fault: Origin Node cannot match Target Destination Terminal Node", "error");
+                    return;
+                }
+
+                this.platform.toast(`Running Route Optimization Solver: Factor [${profile.toUpperCase()}]`, "info");
+
+                const origCoords = this.platform.geoNodes[origin];
+                const destCoords = this.platform.geoNodes[destination];
+                
+                // Clear Previous Route Chains Polylines From Operational Map Overlay Workspace Canvas
+                if (this.platform.routingControl) {
+                    this.platform.map.removeControl(this.platform.routingControl);
+                }
+
+                let waypointsArray = [L.latLng(origCoords[0], origCoords[1])];
+                if (waypoint && waypoint !== origin && waypoint !== destination) {
+                    const wpCoords = this.platform.geoNodes[waypoint];
+                    waypointsArray.push(L.latLng(wpCoords[0], wpCoords[1]));
+                }
+                waypointsArray.push(L.latLng(destCoords[0], destCoords[1]));
+
+                // Construct Leaflet Routing Engine Control Protocol Link
+                this.platform.routingControl = L.Routing.control({
+                    waypoints: waypointsArray,
+                    routeWhileDragging: false,
+                    addWaypoints: false,
+                    show: false, // Suppress Native UI Instruction Text Block List Overlay Panel
+                    lineOptions: { styles: [{ color: this.getRouteColor(profile), opacity: 0.85, weight: 6 }] }
+                }).addTo(this.platform.map);
+
+                // Mock Dynamic Parametric Logistical Calculations Calculations Matrix Formula Logic
+                this.calculateMetricProjections(origCoords, destCoords, vehicleType, profile);
+            }
+
+            getRouteColor(p) {
+                if (p === 'fastest') return '#3b82f6';
+                if (p === 'safest') return '#10b981';
+                if (p === 'efficient') return '#0d9488';
+                return '#1e3a8a';
+            }
+
+            calculateMetricProjections(c1, c2, vType, profile) {
+                // Haversine Approximator Formula Vector Constant Compute Calculation Engine
+                const R = 6371; // Earth KM radius scale factor
+                const dLat = (c2[0]-c1[0]) * Math.PI / 180;
+                const dLon = (c2[1]-c1[1]) * Math.PI / 180;
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(c1[0]*Math.PI/180) * Math.cos(c2[0]*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                let baseDistance = R * c; 
+
+                if(baseDistance === 0 || isNaN(baseDistance)) baseDistance = 450.00; // Fail-safe default
+
+                let efficiencyMultiplier = 1.0;
+                if(vType === "Heavy Truck") efficiencyMultiplier = 1.6;
+                if(vType === "Container Truck") efficiencyMultiplier = 2.2;
+                if(vType === "Van") efficiencyMultiplier = 0.7;
+
+                let profileMod = 1.0;
+                if (profile === 'fastest') profileMod = 1.15; // Extended Distance, higher velocity toll roads
+                if (profile === 'efficient') profileMod = 0.92; // Eco paths bypass heavy gradients
+
+                const finalDist = baseDistance * profileMod;
+                const finalEta = finalDist / (profile === 'fastest' ? 88 : 72);
+                
+                const fuelLiters = (finalDist / 100) * (20 * efficiencyMultiplier);
+                const fuelCost = fuelLiters * 1.65;
+                const tollCost = (finalDist * 0.12) * (profile === 'fastest' ? 1.5 : 1.0);
+                const driverCost = finalEta * 28.50;
+                const maintCost = finalDist * 0.08;
+                const totalOpex = fuelCost + tollCost + driverCost + maintCost;
+
+                // Bind Calculations Back Instantly To DOM View Layer
+                document.getElementById("metric-distance").innerText = `${finalDist.toFixed(2)} km`;
+                document.getElementById("metric-eta").innerText = `${finalEta.toFixed(1)} hrs`;
+                document.getElementById("metric-fuel").innerText = `$${fuelCost.toFixed(2)}`;
+                document.getElementById("metric-tolls").innerText = `$${tollCost.toFixed(2)}`;
+                document.getElementById("metric-driver").innerText = `$${driverCost.toFixed(2)}`;
+                document.getElementById("metric-maint").innerText = `$${maintCost.toFixed(2)}`;
+                document.getElementById("metric-total-cost").innerText = `$${totalOpex.toFixed(2)}`;
+
+                document.getElementById("route-metrics-panel").classList.remove("hidden");
+                
+                // Adjust Canvas Boundary Viewport Focus Framing
+                this.platform.map.fitBounds([c1, c2], { padding: [50, 50] });
+            }
+        }
+
+        // SHIPMENT DATA OPERATIONS LEDGER MANAGEMENT MODULE LAYER
+        class ShipmentModule {
+            constructor(platform) { this.platform = platform; }
+
+            renderTable() {
+                const body = document.getElementById("shipment-table-body");
+                if(!body) return;
+                body.innerHTML = "";
+
+                const search = document.getElementById("shipment-search")?.value.toLowerCase() || "";
+                const statusFilter = document.getElementById("shipment-filter-status")?.value || "";
+
+                const filtered = this.platform.shipments.filter(s => {
+                    const matchesSearch = s.id.toLowerCase().includes(search) || s.name.toLowerCase().includes(search) || s.customer.toLowerCase().includes(search);
+                    const matchesStatus = statusFilter === "" || s.status === statusFilter;
+                    return matchesSearch && matchesStatus;
+                });
+
+                filtered.forEach(s => {
+                    let badgeColor = "bg-gray-100 text-gray-800";
+                    if (s.status === "In Transit") badgeColor = "bg-blue-100 text-blue-800 font-semibold";
+                    if (s.status === "Delivered") badgeColor = "bg-green-100 text-green-800";
+                    if (s.status === "Delayed") badgeColor = "bg-red-100 text-red-800 font-bold";
+
+                    const html = `
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="p-4 font-mono text-xs font-bold text-blue-900">${s.id}</td>
+                            <td class="p-4">
+                                <p class="font-semibold text-gray-800">${s.name}</p>
+                                <span class="text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">${s.category}</span>
+                            </td>
+                            <td class="p-4 text-xs">
+                                <p class="text-gray-600"><i class="fas fa-arrow-circle-right text-blue-500"></i> ${s.origin}</p>
+                                <p class="text-gray-600 mt-0.5"><i class="fas fa-flag-checkered text-teal-600"></i> ${s.destination}</p>
+                            </td>
+                            <td class="p-4 text-xs">
+                                <p>${s.weight.toLocaleString()} kg</p>
+                                <p class="text-gray-400">${s.volume} m³</p>
+                            </td>
+                            <td class="p-4"><span class="px-2 py-1 rounded-full text-xs ${badgeColor}">${s.status}</span></td>
+                            <td class="p-4 text-right text-xs space-x-1 whitespace-nowrap">
+                                <button onclick="App.shipmentModule.edit('${s.id}')" class="text-blue-600 hover:text-blue-800 p-1"><i class="fas fa-edit"></i></button>
+                                <button onclick="App.shipmentModule.delete('${s.id}')" class="text-red-600 hover:text-red-800 p-1"><i class="fas fa-trash-alt"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                    body.insertAdjacentHTML('beforeend', html);
+                });
+            }
+
+            async handleSave(e) {
+                e.preventDefault();
+                const id = document.getElementById("shipment-id").value || `SH-${Math.floor(1000 + Math.random() * 9000)}`;
+                
+                const payload = {
+                    id,
+                    name: document.getElementById("shipment-name").value,
+                    category: document.getElementById("shipment-category").value,
+                    origin: document.getElementById("shipment-origin").value,
+                    destination: document.getElementById("shipment-destination").value,
+                    weight: parseInt(document.getElementById("shipment-weight").value),
+                    volume: parseInt(document.getElementById("shipment-volume").value),
+                    customer: document.getElementById("shipment-customer").value,
+                    deadline: document.getElementById("shipment-deadline").value,
+                    priority: document.getElementById("shipment-priority").value,
+                    vehicle: document.getElementById("shipment-vehicle").value,
+                    status: document.getElementById("shipment-status").value
+                };
+
+                await this.platform.db.put("shipments", payload);
+                this.platform.toast(`Manifest Repository Synced: ${id}`);
+                this.platform.closeModal("modal-shipment");
+                document.getElementById("form-shipment").reset();
+                await this.platform.reloadAllModulesData();
+                this.platform.costSavingsEngine.compute();
+            }
+
+            async edit(id) {
+                const s = this.platform.shipments.find(item => item.id === id);
+                if(!s) return;
+
+                document.getElementById("shipment-id").value = s.id;
+                document.getElementById("shipment-name").value = s.name;
+                document.getElementById("shipment-category").value = s.category;
+                document.getElementById("shipment-origin").value = s.origin;
+                document.getElementById("shipment-destination").value = s.destination;
+                document.getElementById("shipment-weight").value = s.weight;
+                document.getElementById("shipment-volume").value = s.volume;
+                document.getElementById("shipment-customer").value = s.customer;
+                document.getElementById("shipment-deadline").value = s.deadline;
+                document.getElementById("shipment-priority").value = s.priority;
+                document.getElementById("shipment-vehicle").value = s.vehicle;
+                document.getElementById("shipment-status").value = s.status;
+
+                document.getElementById("shipment-modal-title").innerText = "Modify Operational Freight Manifest";
+                this.platform.openModal("modal-shipment");
+            }
+
+            async delete(id) {
+                if(confirm(`Confirm operational purging deletion of shipment manifest: ${id}?`)) {
+                    await this.platform.db.delete("shipments", id);
+                    this.platform.toast(`Manifest Purged: ${id}`, "error");
+                    await this.platform.reloadAllModulesData();
+                    this.platform.costSavingsEngine.compute();
+                }
+            }
+
+            export(format) {
+                DataExporter.run(this.platform.shipments, "Shipments_Export", format);
+            }
+        }
+
+        // FLEET OPERATIONS DATA LOGISTICS MANAGEMENT MODULE LAYER
+        class FleetModule {
+            constructor(platform) { this.platform = platform; }
+
+            renderTable() {
+                const body = document.getElementById("fleet-table-body");
+                if(!body) return;
+                body.innerHTML = "";
+
+                this.platform.vehicles.forEach(v => {
+                    let color = "text-gray-500 bg-gray-100";
+                    if(v.status === "Active") color = "text-green-800 bg-green-100 font-semibold";
+                    if(v.status === "Maintenance") color = "text-red-800 bg-red-100";
+
+                    const html = `
+                        <tr class="hover:bg-gray-50">
+                            <td class="p-3 font-bold text-gray-700">${v.reg}</td>
+                            <td class="p-3 text-xs font-semibold text-blue-900">${v.type}</td>
+                            <td class="p-3 text-xs">${v.capacity.toLocaleString()} kg <p class="text-gray-400 text-[10px]">${v.efficiency} L/100km</p></td>
+                            <td class="p-3 text-xs text-gray-600">${v.driver}</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded text-xs ${color}">${v.status}</span></td>
+                            <td class="p-3 text-right text-xs space-x-1">
+                                <button onclick="App.fleetModule.edit('${v.id}')" class="text-blue-500 hover:text-blue-700"><i class="fas fa-edit"></i></button>
+                                <button onclick="App.fleetModule.delete('${v.id}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash-alt"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                    body.insertAdjacentHTML('beforeend', html);
+                });
+            }
+
+            async handleSave(e) {
+                e.preventDefault();
+                const id = document.getElementById("fleet-id").value || `v-${Date.now()}`;
+                const payload = {
+                    id,
+                    reg: document.getElementById("fleet-reg").value,
+                    type: document.getElementById("fleet-type").value,
+                    capacity: parseInt(document.getElementById("fleet-capacity").value),
+                    efficiency: parseFloat(document.getElementById("fleet-efficiency").value),
+                    driver: document.getElementById("fleet-driver").value,
+                    status: document.getElementById("fleet-status").value
+                };
+                await this.platform.db.put("vehicles", payload);
+                this.platform.toast(`Vehicle Log Commited: ${payload.reg}`);
+                this.resetForm();
+                await this.platform.reloadAllModulesData();
+                this.platform.populateDropdownSelects();
+            }
+
+            edit(id) {
+                const v = this.platform.vehicles.find(item => item.id === id);
+                if(!v) return;
+                document.getElementById("fleet-id").value = v.id;
+                document.getElementById("fleet-reg").value = v.reg;
+                document.getElementById("fleet-type").value = v.type;
+                document.getElementById("fleet-capacity").value = v.capacity;
+                document.getElementById("fleet-efficiency").value = v.efficiency;
+                document.getElementById("fleet-driver").value = v.driver;
+                document.getElementById("fleet-status").value = v.status;
+            }
+
+            async delete(id) {
+                if(confirm("Decommission and remove vehicle asset from fleet index core stores?")) {
+                    await this.platform.db.delete("vehicles", id);
+                    this.platform.toast("Asset Registry Decommissioned", "error");
+                    await this.platform.reloadAllModulesData();
+                    this.platform.populateDropdownSelects();
+                }
+            }
+
+            resetForm() {
+                document.getElementById("form-fleet").reset();
+                document.getElementById("fleet-id").value = "";
+            }
+
+            export(format) { DataExporter.run(this.platform.vehicles, "Fleet_Assets", format); }
+        }
+
+        // PHYSICAL WAREHOUSE CAPACITY TRACKING & MANAGEMENT LAYER MODULE
+        class WarehouseModule {
+            constructor(platform) { this.platform = platform; }
+
+            renderCards() {
+                const container = document.getElementById("warehouse-cards-container");
+                if(!container) return;
+                container.innerHTML = "";
+
+                this.platform.warehouses.forEach(w => {
+                    const pct = Math.min(100, Math.round((w.occupancy / w.capacity) * 100));
+                    let progressColor = "bg-blue-600";
+                    if(pct > 75) progressColor = "bg-amber-500";
+                    if(pct > 90) progressColor = "bg-red-600 animate-pulse";
+
+                    const html = `
+                        <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between space-y-3 hover:shadow-md transition-shadow">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h4 class="font-bold text-gray-800 leading-tight">${w.name}</h4>
+                                    <p class="text-xs text-gray-400 mt-0.5"><i class="fas fa-map-marker-alt"></i> ${w.location}</p>
+                                </div>
+                                <div class="flex gap-1.5 text-xs">
+                                    <button onclick="App.warehouseModule.edit('${w.id}')" class="text-blue-600 p-1"><i class="fas fa-edit"></i></button>
+                                    <button onclick="App.warehouseModule.delete('${w.id}')" class="text-red-500 p-1"><i class="fas fa-trash-alt"></i></button>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs text-gray-500 mb-1">
+                                    <span>Floor Mass Vol: ${w.occupancy.toLocaleString()} / ${w.capacity.toLocaleString()} m³</span>
+                                    <span class="font-bold text-gray-700">${pct}%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                                    <div class="h-full ${progressColor}" style="width: ${pct}%"></div>
+                                </div>
+                            </div>
+                            <div class="text-[11px] text-gray-400 border-t pt-2 flex justify-between">
+                                <span>Manager: <b>${w.manager}</b></span>
+                                <span class="text-blue-600 cursor-pointer font-semibold hover:underline" onclick="App.switchTab('inventory')">View Ledger →</span>
+                            </div>
+                        </div>
+                    `;
+                    container.insertAdjacentHTML('beforeend', html);
+                });
+            }
+
+            async handleSave(e) {
+                e.preventDefault();
+                const id = document.getElementById("warehouse-id").value || `wh-${Date.now()}`;
+                
+                // Keep Track of Existing Occupancy Records if editing
+                const existing = this.platform.warehouses.find(x => x.id === id);
+                const occupancy = existing ? existing.occupancy : 0;
+
+                const payload = {
+                    id,
+                    name: document.getElementById("warehouse-name").value,
+                    location: document.getElementById("warehouse-location").value,
+                    capacity: parseInt(document.getElementById("warehouse-capacity").value),
+                    occupancy,
+                    manager: document.getElementById("warehouse-manager").value
+                };
+                await this.platform.db.put("warehouses", payload);
+                this.platform.toast(`Node Facility Log Locked: ${payload.name}`);
+                this.resetForm();
+                await this.platform.reloadAllModulesData();
+                this.platform.populateDropdownSelects();
+            }
+
+            edit(id) {
+                const w = this.platform.warehouses.find(item => item.id === id);
+                if(!w) return;
+                document.getElementById("warehouse-id").value = w.id;
+                document.getElementById("warehouse-name").value = w.name;
+                document.getElementById("warehouse-location").value = w.location;
+                document.getElementById("warehouse-capacity").value = w.capacity;
+                document.getElementById("warehouse-manager").value = w.manager;
+            }
+
+            async delete(id) {
+                if(confirm("Evacuate and permanently destroy infrastructure link node register from core systems mapping indexes?")) {
+                    await this.platform.db.delete("warehouses", id);
+                    this.platform.toast("Infrastructure Node Evacuated", "error");
+                    await this.platform.reloadAllModulesData();
+                    this.platform.populateDropdownSelects();
+                }
+            }
+
+            resetForm() {
+                document.getElementById("form-warehouse").reset();
+                document.getElementById("warehouse-id").value = "";
+            }
+
+            export(format) { DataExporter.run(this.platform.warehouses, "Warehouse_Nodes", format); }
+        }
+
+        // STOCK INVENTORY MANIFEST & SKU TRAFFIC LOG MATRIX LAYER
+        class InventoryModule {
+            constructor(platform) { this.platform = platform; }
+
+            renderTable() {
+                const body = document.getElementById("inventory-table-body");
+                if(!body) return;
+                body.innerHTML = "";
+
+                this.platform.inventory.forEach(i => {
+                    const html = `
+                        <tr class="hover:bg-gray-50">
+                            <td class="p-3 font-mono text-xs font-bold text-indigo-900">${i.sku}</td>
+                            <td class="p-3 font-semibold text-gray-800">${i.name}</td>
+                            <td class="p-3 text-xs font-bold">${i.quantity.toLocaleString()} units</td>
+                            <td class="p-3 text-xs text-gray-500">${i.warehouse}</td>
+                            <td class="p-3 text-xs"><span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-medium">${i.status}</span></td>
+                            <td class="p-3 text-right text-xs space-x-2">
+                                <button onclick="App.inventoryModule.edit('${i.id}')" class="text-blue-500 hover:text-blue-700"><i class="fas fa-edit"></i></button>
+                                <button onclick="App.inventoryModule.delete('${i.id}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash-alt"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                    body.insertAdjacentHTML('beforeend', html);
+                });
+
+                this.renderTimeline();
+            }
+
+            renderTimeline() {
+                const tBox = document.getElementById("inventory-timeline");
+                if(!tBox) return;
+                tBox.innerHTML = "";
+
+                // Display latest records first
+                const sorted = [...this.platform.timeline].sort((a,b) => b.timestamp.localeCompare(a.timestamp));
+                
+                sorted.slice(0, 5).forEach(t => {
+                    const html = `
+                        <div class="flex items-start gap-3 relative z-10 pl-1 text-xs">
+                            <div class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-[10px] shadow-sm flex-shrink-0">
+                                <i class="fas fa-exchange-alt"></i>
+                            </div>
+                            <div class="bg-gray-50 p-2 rounded-lg border border-gray-100 flex-1">
+                                <span class="text-[10px] text-gray-400 font-mono block mb-0.5">${t.timestamp} | SKU: ${t.sku}</span>
+                                <p class="text-gray-700 font-medium">${t.message}</p>
+                            </div>
+                        </div>
+                    `;
+                    tBox.insertAdjacentHTML('beforeend', html);
+                });
+            }
+
+            async handleSave(e) {
+                e.preventDefault();
+                const id = document.getElementById("inventory-id").value || `inv-${Date.now()}`;
+                const sku = document.getElementById("inventory-sku").value;
+                const name = document.getElementById("inventory-name").value;
+                const qty = parseInt(document.getElementById("inventory-quantity").value);
+                const warehouseName = document.getElementById("inventory-warehouse").value;
+                const status = document.getElementById("inventory-status").value;
+
+                const payload = { id, sku, name, quantity: qty, warehouse: warehouseName, status };
+                
+                // Adjust physical warehouse allocation node capacity metrics calculation vector automatically
+                const targetWh = this.platform.warehouses.find(w => w.name === warehouseName);
+                if(targetWh) {
+                    targetWh.occupancy = Math.min(targetWh.capacity, targetWh.occupancy + (qty * 0.15));
+                    await this.platform.db.put("warehouses", targetWh);
+                }
+
+                await this.platform.db.put("inventory", payload);
+
+                // Commit Log Audit Trail Record Entry
+                const log = {
+                    id: `t-${Date.now()}`,
+                    timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
+                    sku,
+                    message: `Ledger Entry Committed: ${qty} units tracked inside [${warehouseName}] under state [${status}]`
+                };
+                await this.platform.db.put("timeline", log);
+
+                this.platform.toast(`SKU Inventory Locked: ${sku}`);
+                this.resetForm();
+                await this.platform.reloadAllModulesData();
+            }
+
+            edit(id) {
+                const i = this.platform.inventory.find(item => item.id === id);
+                if(!i) return;
+                document.getElementById("inventory-id").value = i.id;
+                document.getElementById("inventory-sku").value = i.sku;
+                document.getElementById("inventory-name").value = i.name;
+                document.getElementById("inventory-quantity").value = i.quantity;
+                document.getElementById("inventory-warehouse").value = i.warehouse;
+                document.getElementById("inventory-status").value = i.status;
+            }
+
+            async delete(id) {
+                if(confirm("Purge asset stock tracking ledger identifier index permanently?")) {
+                    await this.platform.db.delete("inventory", id);
+                    this.platform.toast("Ledger Entry Erased", "error");
+                    await this.platform.reloadAllModulesData();
+                }
+            }
+
+            resetForm() {
+                document.getElementById("form-inventory").reset();
+                document.getElementById("inventory-id").value = "";
+            }
+
+            export(format) { DataExporter.run(this.platform.inventory, "SKU_Inventory", format); }
+        }
+
+        // AUTOMATED COST-SAVING & FREIGHT CONSOLIDATION INTELLIGENCE ADVISORY ENGINE
+        class CostSavingsEngine {
+            constructor(platform) { this.platform = platform; }
+
+            compute() {
+                const container = document.getElementById("cost-savings-container");
+                if(!container) return;
+                container.innerHTML = "";
+
+                let dynamicSavingsSum = 0;
+                
+                // Strategy Rule 1: Consolidation Potentials Search Matrix
+                const plannedShipments = this.platform.shipments.filter(s => s.status === "Planned" || s.status === "Assigned");
+                if (plannedShipments.length > 1) {
+                    const saved = 1450.00;
+                    dynamicSavingsSum += saved;
+                    container.insertAdjacentHTML('beforeend', this.buildAdviceCard("Vehicle Consolidation Opportunity", "Two or more pending shipments share proximal freight routing lanes. Merge manifests to unlock single vehicle rigid linehaul efficiency.", saved, "fa-compress-arrows-alt"));
+                } else {
+                    container.insertAdjacentHTML('beforeend', this.buildAdviceCard("Vehicle Consolidation", "Lanes run unified. Assets optimized. No trailing deadhead risks detected.", 0, "fa-check-circle", "text-teal-400"));
+                }
+
+                // Strategy Rule 2: Multi-stop Spatial Route Chaining Optimization
+                if(this.platform.shipments.length > 0) {
+                    const saved = 840.00;
+                    dynamicSavingsSum += saved;
+                    container.insertAdjacentHTML('beforeend', this.buildAdviceCard("Alternative Routing Option Run", "Bypassing alternative multi-stop structures. Regional port congestion indicates bypassing regional hubs will save time matrix fuel drains.", saved, "fa-random"));
+                }
+
+                // Strategy Rule 3: Space Efficiency & Empty Miles Reductions Trigger
+                const maintenanceAssets = this.platform.vehicles.filter(v => v.status === "Maintenance").length;
+                if(maintenanceAssets > 0) {
+                    const saved = 1200.00;
+                    dynamicSavingsSum += saved;
+                    container.insertAdjacentHTML('beforeend', this.buildAdviceCard("Empty Backhaul Prevention", "Intercept scheduling configurations to secure third-party contract return payloads for returning empty service vans.", saved, "fa-exchange-alt"));
+                }
+
+                // Strategy Rule 4: Warehouse Volumetric Allocation Footprint Guard
+                let spaceStrainDetected = false;
+                this.platform.warehouses.forEach(w => { if((w.occupancy/w.capacity) > 0.8) spaceStrainDetected = true; });
+                if(spaceStrainDetected) {
+                    const saved = 2400.00;
+                    dynamicSavingsSum += saved;
+                    container.insertAdjacentHTML('beforeend', this.buildAdviceCard("Warehouse Volumetric Optimization", "High density floor footprint nearing limits. Reroute upcoming non-critical incoming freight units directly.", saved, "fa-warehouse"));
+                } else {
+                    container.insertAdjacentHTML('beforeend', this.buildAdviceCard("Storage Floor Integrity Clear", "Node floor occupancy rates optimal. Buffer metrics clear for upcoming Q3 intake workflows.", 0, "fa-shield-alt", "text-blue-400"));
+                }
+
+                // Cascade metrics results directly back cleanly into header dashboard trackers
+                document.getElementById("header-savings").innerText = `$${dynamicSavingsSum.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                const dashSavings = document.getElementById("dash-total-savings");
+                if(dashSavings) dashSavings.innerText = `$${dynamicSavingsSum.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+            }
+
+            buildAdviceCard(title, body, savings, icon, colorClass = "text-yellow-400") {
+                return `
+                    <div class="bg-white bg-opacity-10 p-4 rounded-xl border border-white border-opacity-10 flex flex-col justify-between space-y-2">
+                        <div class="flex items-start justify-between gap-2">
+                            <h4 class="font-semibold text-sm leading-tight text-white">${title}</h4>
+                            <i class="fas ${icon} ${colorClass} text-base flex-shrink-0"></i>
+                        </div>
+                        <p class="text-xs text-blue-100 leading-relaxed">${body}</p>
+                        <div class="pt-2 border-t border-white border-opacity-10 flex justify-between items-center text-xs">
+                            <span class="text-blue-300">Est. Retained:</span>
+                            <span class="font-bold ${savings > 0 ? 'text-green-400' : 'text-white'}">${savings > 0 ? '+$' + savings.toFixed(2) : 'Optimized'}</span>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // RAW SYSTEM HARD DATA EXTRACTION & EXPORT CONTROLLER ENGINE LAYER
+        class DataExporter {
+            static run(dataArray, filename, format) {
+                if(!dataArray || dataArray.length === 0) {
+                    alert("Export Operations Error: System cannot export an empty database array sequence matrix.");
+                    return;
+                }
+
+                let outputString = "";
+                let mimeType = "text/plain";
+
+                if (format === 'json') {
+                    outputString = JSON.stringify(dataArray, null, 2);
+                    mimeType = "application/json";
+                    filename += ".json";
+                } else if (format === 'csv') {
+                    const headers = Object.keys(dataArray[0]);
+                    const csvRows = [headers.join(",")];
+                    
+                    for (const row of dataArray) {
+                        const values = headers.map(header => {
+                            const val = row[header];
+                            return typeof val === 'string' && val.includes(',') ? `"${val}"` : val;
+                        });
+                        csvRows.push(values.join(","));
+                    }
+                    outputString = csvRows.join("\n");
+                    mimeType = "text/csv";
+                    filename += ".csv";
+                }
+
+                const blob = new Blob([outputString], { type: mimeType });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+
+        // WIRE RUNTIME ENGINE APP INSTANCE INSTANTIATION
+        const App = new CorePlatform();
+        
+        // ATTRIBUTE EXTENSION ATTACHMENTS FOR INSTANCE SUBSYSTEM FLOW CONTROL LINKAGE
+        App.routeEngine = new RouteEngineModule(App);
+        App.shipmentModule = new ShipmentModule(App);
+        App.fleetModule = new FleetModule(App);
+        App.warehouseModule = new WarehouseModule(App);
+        App.inventoryModule = new InventoryModule(App);
+        App.costSavingsEngine = new CostSavingsEngine(App);
+
+        // INITIAL DOM REFRESH WIRE PROCESSOR EXECUTION TRIGGER
+        window.addEventListener("DOMContentLoaded", () => App.start());
+
+    </script>
+</body>
+</html>
